@@ -1,0 +1,92 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+    /* Background: soft gray */
+    --background: 0.975 0.005 200;
+    --foreground: 0.18 0.025 240;
+    --card: 1 0 0;
+    --card-foreground: 0.18 0.025 240;
+    --popover: 1 0 0;
+    --popover-foreground: 0.18 0.025 240;
+    /* Primary teal #14B8A6 */
+    --primary: 0.65 0.13 185;
+    --primary-foreground: 1 0 0;
+    --secondary: 0.94 0.02 185;
+    --secondary-foreground: 0.35 0.08 185;
+    --muted: 0.95 0.01 200;
+    --muted-foreground: 0.52 0.03 220;
+    --accent: 0.92 0.04 185;
+    --accent-foreground: 0.35 0.08 185;
+    /* Destructive Red */
+    --destructive: 0.55 0.2 25;
+    --destructive-foreground: 1 0 0;
+    --border: 0.9 0.015 200;
+    --input: 0.92 0.01 200;
+    --ring: 0.65 0.13 185;
+    /* Status tokens */
+    --token-white: 1 0 0;
+    --token-red: 0.55 0.2 25;
+    --token-orange: 0.72 0.16 55;
+    --token-yellow: 0.85 0.16 88;
+    --token-green: 0.6 0.15 145;
+    /* Chart */
+    --chart-1: 0.65 0.13 185;
+    --chart-2: 0.6 0.15 145;
+    --chart-3: 0.72 0.16 55;
+    --chart-4: 0.55 0.2 25;
+    --chart-5: 0.85 0.16 88;
+    --sidebar: 0.98 0.01 200;
+    --sidebar-foreground: 0.18 0.025 240;
+    --sidebar-primary: 0.65 0.13 185;
+    --sidebar-primary-foreground: 1 0 0;
+    --sidebar-accent: 0.92 0.03 185;
+    --sidebar-accent-foreground: 0.35 0.08 185;
+    --sidebar-border: 0.9 0.015 200;
+    --sidebar-ring: 0.65 0.13 185;
+    /* Admin sidebar: dark navy */
+    --admin-sidebar: 0.2 0.04 240;
+    --admin-sidebar-fg: 1 0 0;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .token-white {
+    background-color: white;
+    border: 2px solid #e2e8f0;
+    color: #64748b;
+  }
+  .token-red {
+    background-color: #ef4444;
+    border: 2px solid #dc2626;
+    color: white;
+  }
+  .token-orange {
+    background-color: #f97316;
+    border: 2px solid #ea580c;
+    color: white;
+  }
+  .token-yellow {
+    background-color: #fbbf24;
+    border: 2px solid #f59e0b;
+    color: #78350f;
+  }
+  .token-green {
+    background-color: #22c55e;
+    border: 2px solid #16a34a;
+    color: white;
+  }
+}
