@@ -49,7 +49,7 @@ import {
   User,
   XCircle,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "../../context/StoreContext";
 import {
@@ -118,7 +118,7 @@ export default function DoctorDashboard() {
     price: String(doctor?.price ?? 0),
     tokensPerSession: String(doctor?.tokensPerSession ?? 20),
     sessions: doctor?.sessions ?? ([] as SessionType[]),
-    contactPhone: doctor?.contactPhone ?? "",
+    contactPhone: doctor?.contactPhone || doctor?.phone || "",
     yearsOfExperience: doctor?.yearsOfExperience ?? "",
     education: doctor?.education ?? "",
     languages: doctor?.languages ?? ([] as string[]),
@@ -128,6 +128,28 @@ export default function DoctorDashboard() {
   });
 
   const [langInput, setLangInput] = useState("");
+
+  // ── Sync profileForm when doctor reloads from server ─────────────────────
+  // Runs whenever the doctor object changes (30s background refresh)
+  // Critical: phone number must always reflect server value so login keeps working
+  useEffect(() => {
+    if (!doctor) return;
+    setProfileForm({
+      name: doctor.name ?? "",
+      specialty: doctor.specialty ?? "",
+      bio: doctor.bio ?? "",
+      price: String(doctor.price ?? 0),
+      tokensPerSession: String(doctor.tokensPerSession ?? 20),
+      sessions: (doctor.sessions ?? []) as SessionType[],
+      // Read phone from both fields — backend returns it as "phone"
+      contactPhone: doctor.contactPhone || (doctor as any).phone || "",
+      yearsOfExperience: doctor.yearsOfExperience ?? "",
+      education: doctor.education ?? "",
+      languages: doctor.languages ?? [],
+      sessionTimings: (doctor.sessionTimings ?? {}) as Partial<Record<SessionType, SessionTiming>>,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doctor?.id, (doctor as any)?.phone, doctor?.contactPhone]);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const today = new Date().toISOString().split("T")[0];
@@ -207,20 +229,26 @@ export default function DoctorDashboard() {
   }, [tokenDialog.tokenNum, statuses]);
 
   function handleSaveProfile() {
-    updateDoctor(doctor.id, {
+    const payload: Record<string, unknown> = {
       name: profileForm.name,
       specialty: profileForm.specialty,
       bio: profileForm.bio,
       price: Number(profileForm.price),
       tokensPerSession: Number(profileForm.tokensPerSession),
       sessions: profileForm.sessions,
-      contactPhone: profileForm.contactPhone,
       yearsOfExperience: profileForm.yearsOfExperience,
       education: profileForm.education,
       languages: profileForm.languages,
       consultationFee: Number(profileForm.price),
       sessionTimings: profileForm.sessionTimings,
-    });
+    };
+    // Only send phone if it has a value — never overwrite with empty string
+    // Phone is the doctor's login password so it must never be blanked
+    if (profileForm.contactPhone.trim()) {
+      payload.contactPhone = profileForm.contactPhone.trim();
+      payload.phone = profileForm.contactPhone.trim();
+    }
+    updateDoctor(doctor.id, payload as any);
     toast.success("Profile updated successfully");
   }
 
@@ -852,21 +880,27 @@ export default function DoctorDashboard() {
                     htmlFor="doc-phone"
                     className="flex items-center gap-1.5 text-sm font-medium"
                   >
-                    <Phone className="w-3.5 h-3.5 text-gray-400" /> Contact
-                    Phone
+                    <Phone className="w-3.5 h-3.5 text-gray-400" /> Phone
+                    Number
+                    <span className="ml-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-normal">
+                      Login Password
+                    </span>
                   </Label>
-                  <Input
-                    id="doc-phone"
-                    value={profileForm.contactPhone}
-                    placeholder="e.g. +91 98765 43210"
-                    onChange={(e) =>
-                      setProfileForm((p) => ({
-                        ...p,
-                        contactPhone: e.target.value,
-                      }))
-                    }
-                    data-ocid="profile.input"
-                  />
+                  <div className="relative">
+                    <Input
+                      id="doc-phone"
+                      value={profileForm.contactPhone}
+                      placeholder="Set by admin — contact admin to change"
+                      readOnly
+                      className="pr-10 bg-gray-50 text-gray-600 cursor-not-allowed"
+                      data-ocid="profile.input"
+                    />
+                    <Lock className="absolute right-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
+                  </div>
+                  <p className="text-xs text-amber-600 flex items-center gap-1">
+                    <Lock className="w-3 h-3" />
+                    This is your login password. Only the admin can change it.
+                  </p>
                 </div>
                 <div className="space-y-1.5">
                   <Label
