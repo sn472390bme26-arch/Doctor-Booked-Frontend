@@ -73,8 +73,6 @@ export default function BookingDialog({
     }
   }, [open, doctor.id]); // eslint-disable-line
 
-  const availableDates = useMemo(() => getAvailableDates(), []);
-
   function getBookedCount(date: string, session: string): number {
     const sid = makeSessionId(doctor.id, date, session);
     // Use token state from backend (real count across ALL patients)
