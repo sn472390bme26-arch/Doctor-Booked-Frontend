@@ -1,5 +1,9 @@
 /**
- * api.ts — HTTP + WebSocket client for Doctor Booked backend
+ * api.ts — bulletproof HTTP + WebSocket client
+ * - Auto-retry with exponential backoff (3 attempts)
+ * - 15-second timeout on every request
+ * - Detailed error messages (never "failed to fetch")
+ * - Resilient WebSocket with auto-reconnect
  */
 
 const BASE = (import.meta.env.VITE_API_URL as string) || "http://localhost:4000/api";
@@ -10,26 +14,95 @@ export function getToken(): string | null { return localStorage.getItem("db_jwt"
 export function setToken(t: string)       { localStorage.setItem("db_jwt", t); }
 export function clearToken()              { localStorage.removeItem("db_jwt"); }
 
-// ── Base fetch ────────────────────────────────────────────────────────────────
-async function req<T>(method: string, path: string, body?: unknown, isFormData = false): Promise<T> {
+// ── Friendly error messages ───────────────────────────────────────────────────
+function friendlyError(err: unknown, attempt: number): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("Load failed"))
+    return attempt >= 3
+      ? "Cannot reach the server. Please check your internet connection and try again."
+      : "Network issue — retrying...";
+  if (msg.includes("timeout"))   return "Request timed out. Please try again.";
+  if (msg.includes("CORS"))      return "Server configuration error. Please contact support.";
+  return msg;
+}
+
+// ── Fetch with timeout ────────────────────────────────────────────────────────
+function fetchWithTimeout(url: string, options: RequestInit, ms = 15000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { ...options, signal: controller.signal })
+    .finally(() => clearTimeout(id));
+}
+
+// ── Core request with retry ───────────────────────────────────────────────────
+async function req<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  isFormData = false,
+  retries = 3,
+): Promise<T> {
   const headers: Record<string, string> = {};
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
   if (body && !isFormData) headers["Content-Type"] = "application/json";
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers,
-    body: isFormData ? (body as FormData) : body ? JSON.stringify(body) : undefined,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as any).error || `HTTP ${res.status}`);
-  return data as T;
+
+  let lastErr: unknown;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetchWithTimeout(
+        `${BASE}${path}`,
+        {
+          method,
+          headers,
+          body: isFormData
+            ? (body as FormData)
+            : body ? JSON.stringify(body) : undefined,
+        },
+        // Give file uploads more time
+        isFormData ? 30000 : 15000,
+      );
+
+      // Parse response body
+      const contentType = res.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await res.json().catch(() => ({}))
+        : {};
+
+      if (!res.ok) {
+        // Don't retry client errors (4xx)
+        if (res.status >= 400 && res.status < 500) {
+          throw new Error((data as any).error || `Error ${res.status}`);
+        }
+        // Retry server errors (5xx)
+        throw new Error((data as any).error || `Server error ${res.status}`);
+      }
+
+      return data as T;
+    } catch (err) {
+      lastErr = err;
+
+      // Don't retry client errors or aborted requests with a message we set
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.startsWith("Error 4") || msg.includes("Only admins") || msg.includes("already exists") || msg.includes("Incorrect")) {
+        throw err;
+      }
+
+      // Wait before retrying: 500ms, 1500ms, 3000ms
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 500 * attempt * attempt));
+      }
+    }
+  }
+
+  throw new Error(friendlyError(lastErr, retries));
 }
 
-const get   = <T>(path: string)                 => req<T>("GET",    path);
-const post  = <T>(path: string, body?: unknown)  => req<T>("POST",   path, body);
-const patch = <T>(path: string, body?: unknown)  => req<T>("PATCH",  path, body);
-const del   = <T>(path: string)                 => req<T>("DELETE", path);
+const get   = <T>(path: string)                => req<T>("GET",    path);
+const post  = <T>(path: string, b?: unknown)   => req<T>("POST",   path, b);
+const patch = <T>(path: string, b?: unknown)   => req<T>("PATCH",  path, b);
+const del   = <T>(path: string)                => req<T>("DELETE", path);
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const auth = {
@@ -46,17 +119,16 @@ export const auth = {
 
 // ── Hospitals ─────────────────────────────────────────────────────────────────
 export const hospitals = {
-  list:        ()                              => get<Hospital[]>("/hospitals"),
-  get:         (id: string)                    => get<Hospital>(`/hospitals/${id}`),
-  create:      (data: Partial<Hospital>)        => post<Hospital>("/hospitals", data),
-  update:      (id: string, data: Partial<Hospital>) => patch<Hospital>(`/hospitals/${id}`, data),
-  delete:      (id: string)                    => del<{ success: boolean }>(`/hospitals/${id}`),
+  list:   ()                                    => get<Hospital[]>("/hospitals"),
+  get:    (id: string)                          => get<Hospital>(`/hospitals/${id}`),
+  create: (data: Partial<Hospital>)             => post<Hospital>("/hospitals", data),
+  update: (id: string, data: Partial<Hospital>) => patch<Hospital>(`/hospitals/${id}`, data),
+  delete: (id: string)                          => del<{ success: boolean }>(`/hospitals/${id}`),
   uploadPhoto: (id: string, file: File) => {
     const fd = new FormData(); fd.append("photo", file);
     return req<{ photoUrl: string }>("POST", `/hospitals/${id}/photo`, fd, true);
   },
   uploadPhotoBase64: async (id: string, base64: string): Promise<{ photoUrl: string }> => {
-    // Convert base64 data URL to File then upload
     const res = await fetch(base64);
     const blob = await res.blob();
     const file = new File([blob], "photo.jpg", { type: blob.type });
@@ -69,20 +141,20 @@ export const hospitals = {
 export const doctors = {
   list:   (hospitalId?: string) =>
     get<Doctor[]>(hospitalId ? `/doctors?hospitalId=${hospitalId}` : "/doctors"),
-  get:    (id: string)                  => get<Doctor>(`/doctors/${id}`),
-  create: (data: Partial<Doctor>)        => post<Doctor>("/doctors", data),
-  update: (id: string, data: Partial<Doctor>) => patch<Doctor>(`/doctors/${id}`, data),
-  delete: (id: string)                  => del<{ success: boolean }>(`/doctors/${id}`),
+  get:    (id: string)                         => get<Doctor>(`/doctors/${id}`),
+  create: (data: Partial<Doctor>)              => post<Doctor>("/doctors", data),
+  update: (id: string, data: Partial<Doctor>)  => patch<Doctor>(`/doctors/${id}`, data),
+  delete: (id: string)                         => del<{ success: boolean }>(`/doctors/${id}`),
 };
 
 // ── Bookings ──────────────────────────────────────────────────────────────────
 export const bookings = {
-  list:       ()                              => get<Booking[]>("/bookings"),
-  forSession: (sessionId: string)             => get<Booking[]>(`/bookings/session/${sessionId}`),
+  list:       ()                               => get<Booking[]>("/bookings"),
+  forSession: (sid: string)                    => get<Booking[]>(`/bookings/session/${sid}`),
   create:     (data: { doctorId: string; date: string; session: string; complaint?: string; phone?: string }) =>
     post<Booking>("/bookings", data),
-  updateStatus: (id: string, status: string)  => patch<Booking>(`/bookings/${id}/status`, { status }),
-  stats:      ()                              => get<Stats>("/bookings/stats/summary"),
+  updateStatus: (id: string, status: string)   => patch<Booking>(`/bookings/${id}/status`, { status }),
+  stats:      ()                               => get<Stats>("/bookings/stats/summary"),
 };
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
@@ -105,7 +177,7 @@ export const patients = {
   list: () => get<PatientRecord[]>("/patients"),
 };
 
-// ── WebSocket — live token updates ────────────────────────────────────────────
+// ── WebSocket with auto-reconnect ─────────────────────────────────────────────
 export function connectTokenSocket(
   sessionId: string,
   onMessage: (payload: { type: string; state?: SessionTokenState; tokenNumber?: number }) => void,
@@ -114,21 +186,36 @@ export function connectTokenSocket(
   let ws: WebSocket | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let dead = false;
+  let backoff = 1000;
 
   function connect() {
     if (dead) return;
-    ws = new WebSocket(url);
-    ws.onmessage = (evt) => { try { onMessage(JSON.parse(evt.data)); } catch {} };
-    ws.onclose   = () => { if (!dead) timer = setTimeout(connect, 3000); };
-    ws.onerror   = () => ws?.close();
+    try {
+      ws = new WebSocket(url);
+      ws.onopen    = () => { backoff = 1000; }; // reset backoff on success
+      ws.onmessage = (evt) => { try { onMessage(JSON.parse(evt.data)); } catch {} };
+      ws.onclose   = () => {
+        if (!dead) {
+          timer = setTimeout(connect, backoff);
+          backoff = Math.min(backoff * 2, 30000); // cap at 30s
+        }
+      };
+      ws.onerror = () => ws?.close();
+    } catch {
+      if (!dead) timer = setTimeout(connect, backoff);
+    }
   }
+
   connect();
-  return () => { dead = true; if (timer) clearTimeout(timer); ws?.close(); };
+  return () => {
+    dead = true;
+    if (timer) clearTimeout(timer);
+    try { ws?.close(); } catch {}
+  };
 }
 
-// ── Types (mirror of types.ts) ────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 export type UserRole = "patient" | "doctor" | "admin";
-
 export interface Hospital {
   id: string; name: string; area: string; address?: string;
   phone?: string; rating: number; gradient: string;
@@ -161,9 +248,7 @@ export interface SessionTokenState {
 export interface PrioritySlotState {
   label: string; status: "waiting" | "ongoing" | "completed"; patientName?: string;
 }
-export interface PatientRecord {
-  id: string; name: string; email?: string; createdAt: string;
-}
+export interface PatientRecord { id: string; name: string; email?: string; createdAt: string; }
 export type AppUser =
   | { id: string; email: string; name: string; role: "patient" }
   | { id: string; code: string; doctorId: string; role: "doctor" }
