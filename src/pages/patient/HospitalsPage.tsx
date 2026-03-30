@@ -3,6 +3,16 @@ import { MapPin, Search, Star, Users } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { useStore } from "../../context/StoreContext";
+
+// Resolve photo URL — Railway returns relative /uploads/... paths
+// On production Vercel we need to prefix with the Railway backend URL
+function resolvePhotoUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  const base = (import.meta.env.VITE_API_URL as string || "")
+    .replace(/\/api$/, "");
+  return base ? `${base}${url}` : url;
+}
 import { useRouter } from "../../router/RouterContext";
 
 export default function HospitalsPage() {
@@ -70,7 +80,7 @@ export default function HospitalsPage() {
                   {hospital.photoUrl ? (
                     <div
                       className="h-36 relative flex flex-col justify-between p-3 bg-cover bg-center"
-                      style={{ backgroundImage: `url(${hospital.photoUrl})` }}
+                      style={{ backgroundImage: `url(${resolvePhotoUrl(hospital.photoUrl)})` }}
                     >
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
                       <div className="relative flex justify-end">

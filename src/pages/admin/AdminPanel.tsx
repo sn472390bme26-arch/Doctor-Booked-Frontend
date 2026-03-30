@@ -62,7 +62,7 @@ export default function AdminPanel() {
             <img
               src="/assets/uploads/final_logo_page-0001-019d2d83-8a36-752f-9b4e-dec5e9e187fd-1.jpg"
               alt="Doctor Booked Logo"
-              className="w-9 h-9 rounded-lg object-contain bg-white"
+              className="w-9 h-9 rounded-lg object-contain bg-white" onError={(e)=>{(e.target as HTMLImageElement).src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%2314b8a6'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='18' font-family='sans-serif'%3EDB%3C/text%3E%3C/svg%3E"}}
             />
             <div>
               <p className="font-bold text-white text-sm">Doctor Booked</p>
@@ -116,7 +116,7 @@ export default function AdminPanel() {
           <img
             src="/assets/uploads/final_logo_page-0001-019d2d83-8a36-752f-9b4e-dec5e9e187fd-1.jpg"
             alt="Doctor Booked Logo"
-            className="w-7 h-7 rounded-lg object-contain bg-white"
+            className="w-7 h-7 rounded-lg object-contain bg-white" onError={(e)=>{(e.target as HTMLImageElement).src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%2314b8a6'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='18' font-family='sans-serif'%3EDB%3C/text%3E%3C/svg%3E"}}
           />
           <span className="font-bold text-sm">Doctor Booked</span>
         </div>
@@ -150,7 +150,7 @@ export default function AdminPanel() {
                 <img
                   src="/assets/uploads/final_logo_page-0001-019d2d83-8a36-752f-9b4e-dec5e9e187fd-1.jpg"
                   alt="Doctor Booked Logo"
-                  className="w-9 h-9 rounded-lg object-contain bg-white"
+                  className="w-9 h-9 rounded-lg object-contain bg-white" onError={(e)=>{(e.target as HTMLImageElement).src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%2314b8a6'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='18' font-family='sans-serif'%3EDB%3C/text%3E%3C/svg%3E"}}
                 />
                 <div>
                   <p className="font-bold text-white text-sm">Doctor Booked</p>

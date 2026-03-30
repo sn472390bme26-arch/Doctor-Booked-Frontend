@@ -40,6 +40,13 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "../../context/StoreContext";
+
+function resolvePhotoUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  const base = (import.meta.env.VITE_API_URL as string || "").replace(/\/api$/, "");
+  return base ? `${base}${url}` : url;
+}
 import type { Hospital } from "../../types";
 
 type EditHospitalForm = {
@@ -462,7 +469,7 @@ export default function AdminHospitals() {
           <div className="space-y-4">
             {photoUrl && (
               <img
-                src={photoUrl}
+                src={resolvePhotoUrl(photoUrl) || ""}
                 alt="Hospital preview"
                 className="w-full h-40 object-cover rounded-lg"
               />

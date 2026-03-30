@@ -5,6 +5,13 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import BookingDialog from "../../components/booking/BookingDialog";
 import { useStore } from "../../context/StoreContext";
+
+function resolvePhotoUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  const base = (import.meta.env.VITE_API_URL as string || "").replace(/\/api$/, "");
+  return base ? `${base}${url}` : url;
+}
 import { getSessionLabel } from "../../data/seed";
 import { useRouter } from "../../router/RouterContext";
 import type { Doctor, SessionType } from "../../types";
@@ -36,11 +43,11 @@ export default function HospitalDoctorsPage({ id }: Props) {
       </Button>
 
       {/* Hospital header */}
-      {hospital.photoUrl ? (
+      {resolvePhotoUrl(hospital.photoUrl) ? (
         <div
           className="h-32 rounded-2xl relative overflow-hidden flex items-end p-6 mb-8"
           style={{
-            backgroundImage: `url(${hospital.photoUrl})`,
+            backgroundImage: `url(${resolvePhotoUrl(hospital.photoUrl)})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
