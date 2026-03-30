@@ -52,6 +52,7 @@ export default function BookingDialog({
     bookToken,
     tokenStates,
     isSessionCancelled,
+    getOrCreateTokenState,
   } = useStore();
   const [step, setStep] = useState<Step>("date");
   const [selectedDate, setSelectedDate] = useState("");
@@ -62,9 +63,28 @@ export default function BookingDialog({
 
   const availableDates = useMemo(() => getAvailableDates(), []);
 
+  // Pre-load token states for today so booked counts are accurate
+  useMemo(() => {
+    if (!open) return;
+    const today = new Date().toISOString().split("T")[0];
+    for (const session of doctor.sessions as SessionType[]) {
+      const sid = makeSessionId(doctor.id, today, session);
+      getOrCreateTokenState(sid, doctor.id, today, session);
+    }
+  }, [open, doctor.id]); // eslint-disable-line
+
+  const availableDates = useMemo(() => getAvailableDates(), []);
+
   function getBookedCount(date: string, session: string): number {
     const sid = makeSessionId(doctor.id, date, session);
-    return bookings.filter((b) => b.sessionId === sid && b.paymentDone).length;
+    // Use token state from backend (real count across ALL patients)
+    // tokenStatuses keys are token numbers 1..N where each is "red","orange","yellow","green","unvisited"
+    const state = tokenStates[sid];
+    if (state) {
+      return Object.keys(state.tokenStatuses).length;
+    }
+    // Fallback: count from local bookings if token state not loaded yet
+    return bookings.filter((b) => b.sessionId === sid && b.paymentDone && b.status !== "cancelled").length;
   }
 
   function handleDateSelect(date: string) {
