@@ -96,7 +96,13 @@ export function isSessionAccessibleForRegulator(
   const times = custom ?? SESSION_TIMES[session];
   if (!times) return false;
   const [startH, startM] = times.start.split(":").map(Number);
-  const startTime = new Date(now);
-  startTime.setHours(startH, startM, 0, 0);
-  return now >= startTime;
+  const [endH, endM] = times.end.split(":").map(Number);
+  // Allow access 30 minutes BEFORE the session start time
+  // so doctors can prepare and start regulating early
+  const unlockTime = new Date(now);
+  unlockTime.setHours(startH, startM - 30, 0, 0);
+  // Also keep accessible until end time
+  const endTime = new Date(now);
+  endTime.setHours(endH, endM, 0, 0);
+  return now >= unlockTime && now <= endTime;
 }

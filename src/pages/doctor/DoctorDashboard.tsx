@@ -687,13 +687,35 @@ export default function DoctorDashboard() {
                       Session Starts at {getSessionStartTime(regSession)}
                     </p>
                     <p className="text-gray-400 text-sm mt-1">
-                      The token regulator will unlock automatically when the
-                      session start time is reached.
+                      The token regulator unlocks 30 minutes before the session start time.
                     </p>
                     <p className="text-gray-400 text-sm mt-0.5">
-                      You can cancel this session using the button above if
-                      needed.
+                      You can cancel this session using the button above if needed.
                     </p>
+                    <Button
+                      className="mt-5 bg-teal-500 hover:bg-teal-600 text-white px-6"
+                      onClick={() => {
+                        // Force-unlock by setting a temporary override in sessionTimings
+                        // so the session is accessible right now
+                        const now = new Date();
+                        const hh = String(now.getHours()).padStart(2, "0");
+                        const mm = String(now.getMinutes()).padStart(2, "0");
+                        updateDoctor(doctor.id, {
+                          sessionTimings: {
+                            ...(doctor.sessionTimings ?? {}),
+                            [regSession]: {
+                              start: `${hh}:${mm}`,
+                              end: (doctor.sessionTimings?.[regSession] ??
+                                DEFAULT_TIMINGS[regSession]).end,
+                            },
+                          },
+                        });
+                        toast.success("Session unlocked — you can now regulate tokens.");
+                      }}
+                    >
+                      <Activity className="w-4 h-4 mr-2" />
+                      Start Session Now
+                    </Button>
                   </div>
                 ) : (
                   <>
