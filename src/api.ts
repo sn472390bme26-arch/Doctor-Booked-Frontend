@@ -223,10 +223,10 @@ export interface Hospital {
 }
 export interface Doctor {
   id: string; hospitalId: string; code?: string; name: string;
-  specialty: string; phone?: string; bio?: string; photo?: string | null;
+  specialty: string; phone?: string; contactPhone?: string; bio?: string; photo?: string | null;
   price: number; consultationFee?: number; tokensPerSession: number;
   sessions: string[];
-  sessionTimings?: Partial<Record<string, { start: string; end: string }>> | null;
+  sessionTimings?: Partial<Record<string, { start: string; end: string }>>;
   isAvailable?: boolean; yearsOfExperience?: string;
   education?: string; languages?: string[];
 }

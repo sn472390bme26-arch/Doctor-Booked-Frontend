@@ -117,8 +117,8 @@ export default function DoctorDashboard() {
     bio: doctor?.bio ?? "",
     price: String(doctor?.price ?? 0),
     tokensPerSession: String(doctor?.tokensPerSession ?? 20),
-    sessions: doctor?.sessions ?? ([] as SessionType[]),
-    contactPhone: doctor?.contactPhone || doctor?.phone || "",
+    sessions: ((doctor?.sessions ?? []) as string[]).filter((s): s is SessionType => ["morning","afternoon","evening"].includes(s)),
+    contactPhone: (doctor as any)?.contactPhone || doctor?.phone || "",
     yearsOfExperience: doctor?.yearsOfExperience ?? "",
     education: doctor?.education ?? "",
     languages: doctor?.languages ?? ([] as string[]),
@@ -140,22 +140,22 @@ export default function DoctorDashboard() {
       bio: doctor.bio ?? "",
       price: String(doctor.price ?? 0),
       tokensPerSession: String(doctor.tokensPerSession ?? 20),
-      sessions: (doctor.sessions ?? []) as SessionType[],
+      sessions: ((doctor.sessions ?? []) as string[]).filter((s): s is SessionType => ["morning","afternoon","evening"].includes(s)),
       // Read phone from both fields — backend returns it as "phone"
-      contactPhone: doctor.contactPhone || (doctor as any).phone || "",
+      contactPhone: (doctor as any).contactPhone || doctor?.phone || "",
       yearsOfExperience: doctor.yearsOfExperience ?? "",
       education: doctor.education ?? "",
       languages: doctor.languages ?? [],
-      sessionTimings: (doctor.sessionTimings ?? {}) as Partial<Record<SessionType, SessionTiming>>,
+      sessionTimings: (doctor.sessionTimings ?? {}) as Partial<Record<SessionType, SessionTiming>> ?? {},
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doctor?.id, (doctor as any)?.phone, doctor?.contactPhone]);
+  }, [doctor?.id, doctor?.phone]); // eslint-disable-line
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const today = new Date().toISOString().split("T")[0];
   const [regDate, setRegDate] = useState(today);
   const [regSession, setRegSession] = useState<SessionType>(
-    doctor?.sessions[0] ?? "morning",
+    (doctor?.sessions?.[0] as SessionType | undefined) ?? "morning",
   );
   const [priorityDialog, setPriorityDialog] = useState<{
     open: boolean;
