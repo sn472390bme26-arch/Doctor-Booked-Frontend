@@ -134,18 +134,6 @@ function LandingPage() {
           </div>
         </div>
       </main>
-
-      <footer className="py-6 text-center text-xs text-gray-400 border-t border-gray-100">
-        &copy; {new Date().getFullYear()}. Built with ❤️ using{" "}
-        <a
-          href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-          className="underline hover:text-gray-600"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          caffeine.ai
-        </a>
-      </footer>
     </div>
   );
 }
