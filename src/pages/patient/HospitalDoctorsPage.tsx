@@ -8,7 +8,11 @@ import { useStore } from "../../context/StoreContext";
 
 function resolvePhotoUrl(url: string | null | undefined): string | null {
   if (!url) return null;
+  // Base64 data URLs work directly — no prefix needed
+  if (url.startsWith("data:")) return url;
+  // Full URLs work directly
   if (url.startsWith("http")) return url;
+  // Relative /uploads/... path — prefix with Railway backend URL
   const base = (import.meta.env.VITE_API_URL as string || "").replace(/\/api$/, "");
   return base ? `${base}${url}` : url;
 }

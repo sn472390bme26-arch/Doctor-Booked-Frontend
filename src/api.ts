@@ -128,13 +128,9 @@ export const hospitals = {
     const fd = new FormData(); fd.append("photo", file);
     return req<{ photoUrl: string }>("POST", `/hospitals/${id}/photo`, fd, true);
   },
-  uploadPhotoBase64: async (id: string, base64: string): Promise<{ photoUrl: string }> => {
-    const res = await fetch(base64);
-    const blob = await res.blob();
-    const file = new File([blob], "photo.jpg", { type: blob.type });
-    const fd = new FormData(); fd.append("photo", file);
-    return req<{ photoUrl: string }>("POST", `/hospitals/${id}/photo`, fd, true);
-  },
+  // Primary method: send base64 directly to DB — photo survives Railway redeploys
+  uploadPhotoBase64: (id: string, base64: string): Promise<{ photoUrl: string }> =>
+    post<{ photoUrl: string }>(`/hospitals/${id}/photo-base64`, { base64 }),
 };
 
 // ── Doctors ───────────────────────────────────────────────────────────────────

@@ -8,10 +8,10 @@ import { useStore } from "../../context/StoreContext";
 // On production Vercel we need to prefix with the Railway backend URL
 function resolvePhotoUrl(url: string | null | undefined): string | null {
   if (!url) return null;
-  if (url.startsWith("http")) return url;
-  const base = (import.meta.env.VITE_API_URL as string || "")
-    .replace(/\/api$/, "");
-  return base ? `${base}${url}` : url;
+  if (url.startsWith("data:")) return url;   // base64 — works directly
+  if (url.startsWith("http")) return url;    // full URL — works directly
+  const base = (import.meta.env.VITE_API_URL as string || "").replace(/\/api$/, "");
+  return base ? `${base}${url}` : url;       // relative /uploads/... path
 }
 import { useRouter } from "../../router/RouterContext";
 
