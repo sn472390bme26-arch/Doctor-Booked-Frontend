@@ -6,14 +6,41 @@ import { SESSION_TIMES } from "../../data/seed";
 import { useRouter } from "../../router/RouterContext";
 import type { SessionType } from "../../types";
 
-const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  confirmed: { label: "Confirmed", className: "bg-blue-100 text-blue-700" },
-  completed: { label: "Completed", className: "bg-green-100 text-green-700" },
-  unvisited: {
-    label: "Refund Pending",
-    className: "bg-orange-100 text-orange-700",
+// Refund rules:
+//   confirmed  = still in queue (red token) — eligible for refund if session is closed without being seen
+//   unvisited  = session ended / skipped without being seen — REFUND ELIGIBLE now
+//   completed  = doctor marked as seen (green token) — NO refund
+//   cancelled  = admin/doctor cancelled — REFUND ELIGIBLE
+const STATUS_BADGE: Record<string, {
+  label: string;
+  className: string;
+  refundEligible: boolean;
+  description: string;
+}> = {
+  confirmed: {
+    label: "In Queue",
+    className: "bg-blue-100 text-blue-700",
+    refundEligible: false,
+    description: "You are in the queue. Track your token for live updates.",
   },
-  cancelled: { label: "Cancelled", className: "bg-red-100 text-red-700" },
+  completed: {
+    label: "Consultation Done",
+    className: "bg-green-100 text-green-700",
+    refundEligible: false,
+    description: "Your consultation was completed. No refund applicable.",
+  },
+  unvisited: {
+    label: "Refund Eligible",
+    className: "bg-orange-100 text-orange-700",
+    refundEligible: true,
+    description: "Session ended without your token being called. You are eligible for a refund.",
+  },
+  cancelled: {
+    label: "Cancelled — Refund Eligible",
+    className: "bg-red-100 text-red-700",
+    refundEligible: true,
+    description: "This session was cancelled. You are eligible for a refund.",
+  },
 };
 
 export default function MyTokensPage() {
@@ -88,11 +115,29 @@ export default function MyTokensPage() {
                       >
                         {STATUS_BADGE[booking.status]?.label ?? booking.status}
                       </span>
+                      {/* Refund badge — only shown when eligible */}
+                      {STATUS_BADGE[booking.status]?.refundEligible && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 flex items-center gap-1">
+                          ↩ Refund Applicable
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
                       <Hospital className="w-3 h-3" />
                       {booking.hospitalName}
                     </div>
+                    {/* Refund description for eligible statuses */}
+                    {STATUS_BADGE[booking.status]?.refundEligible && (
+                      <p className="text-xs text-orange-600 mt-1.5 bg-orange-50 rounded-lg px-2 py-1 border border-orange-100">
+                        {STATUS_BADGE[booking.status].description}
+                      </p>
+                    )}
+                    {/* Completed — no refund explanation */}
+                    {booking.status === "completed" && (
+                      <p className="text-xs text-green-600 mt-1.5 bg-green-50 rounded-lg px-2 py-1 border border-green-100">
+                        {STATUS_BADGE["completed"].description}
+                      </p>
+                    )}
                     <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-gray-500">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5" />
