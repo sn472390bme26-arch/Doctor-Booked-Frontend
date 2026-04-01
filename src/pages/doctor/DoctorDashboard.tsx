@@ -326,20 +326,63 @@ export default function DoctorDashboard() {
 
   function handleMarkAsOngoing() {
     if (tokenDialog.tokenNum === null) return;
-    regulateToken(sessionId, tokenDialog.tokenNum);
-    toast.success(`Token #${tokenDialog.tokenNum} is now being seen`);
+    const calledNum = tokenDialog.tokenNum;
+    regulateToken(sessionId, calledNum);
+    // Find the next token that will become "next up" (yellow)
+    const nextRed = Object.entries(statuses)
+      .filter(([n, s]) => s === "red" && Number(n) !== calledNum)
+      .map(([n]) => Number(n))
+      .sort((a, b) => a - b)[0] ?? null;
+    if (nextRed !== null) {
+      toast.success(
+        `Token #${calledNum} is now with the doctor 🟠 — Token #${nextRed} please get ready 🟡`,
+        { duration: 4000 }
+      );
+    } else {
+      toast.success(`Token #${calledNum} is now with the doctor 🟠`);
+    }
     setTokenDialog({ open: false, tokenNum: null });
   }
 
   function handleMarkCompleted() {
+    const doneNum = tokenDialog.tokenNum;
     completeCurrentToken(sessionId);
-    toast.success("Token completed, moving to next");
+    // Find next queued token (yellow or next red) to notify
+    const nextUp = state => {
+      const s = state?.tokenStatuses ?? statuses;
+      return Object.entries(s)
+        .filter(([n, st]) => (st === "yellow" || st === "red") && Number(n) !== doneNum)
+        .map(([n]) => Number(n))
+        .sort((a, b) => a - b)[0] ?? null;
+    };
+    const nextToken = nextUp(null);
+    if (nextToken !== null) {
+      toast.success(
+        `Token #${doneNum} completed ✓ — Next patient: Token #${nextToken} 🔔`,
+        { duration: 4000 }
+      );
+    } else {
+      toast.success(`Token #${doneNum} consultation completed ✓`);
+    }
     setTokenDialog({ open: false, tokenNum: null });
   }
 
   function handleSkipToken() {
+    const skippedNum = tokenDialog.tokenNum;
     skipToken(sessionId);
-    toast.success("Patient skipped, moving to next token");
+    // Find next red token to notify who is now "next up"
+    const nextRed = Object.entries(statuses)
+      .filter(([n, s]) => s === "red" && Number(n) !== skippedNum)
+      .map(([n]) => Number(n))
+      .sort((a, b) => a - b)[0] ?? null;
+    if (nextRed !== null) {
+      toast.success(
+        `Token #${skippedNum} marked unavailable — Next up: Token #${nextRed} 🔔`,
+        { duration: 4000 }
+      );
+    } else {
+      toast.success(`Token #${skippedNum} marked unavailable.`);
+    }
     setTokenDialog({ open: false, tokenNum: null });
   }
 
@@ -1200,11 +1243,39 @@ export default function DoctorDashboard() {
             </div>
 
             {/* Action buttons based on token status */}
-            {dialogTokenStatus === "orange" ? (
+
+            {/* ── RED / YELLOW: patient is waiting — first interaction ── */}
+            {(dialogTokenStatus === "red" || dialogTokenStatus === "yellow") && (
               <div className="space-y-2">
-                <p className="text-sm text-gray-600">
-                  Status: <span className="font-semibold">Ongoing</span>. Choose
-                  an action:
+                <p className="text-sm text-gray-600 font-medium">
+                  Patient is waiting. Choose an action:
+                </p>
+                {/* PRIMARY: call patient in */}
+                <Button
+                  className="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold h-11"
+                  onClick={handleMarkAsOngoing}
+                  data-ocid="tokens.primary_button"
+                >
+                  <Activity className="w-4 h-4 mr-2" />
+                  Call Patient In (Mark as Ongoing)
+                </Button>
+                {/* SECONDARY: patient not present — mark unavailable immediately */}
+                <Button
+                  className="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold h-11"
+                  onClick={handleSkipToken}
+                  data-ocid="tokens.secondary_button"
+                >
+                  <SkipForward className="w-4 h-4 mr-2" />
+                  Patient Unavailable (Skip &amp; Refund)
+                </Button>
+              </div>
+            )}
+
+            {/* ── ORANGE: patient is currently with doctor — final step ── */}
+            {dialogTokenStatus === "orange" && (
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600 font-medium">
+                  Patient is currently with the doctor.
                 </p>
                 <Button
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-11"
@@ -1212,42 +1283,34 @@ export default function DoctorDashboard() {
                   data-ocid="tokens.confirm_button"
                 >
                   <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Mark as Completed
+                  Consultation Done (Mark Completed)
                 </Button>
-                <Button
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold h-11"
-                  onClick={handleSkipToken}
-                  data-ocid="tokens.secondary_button"
-                >
-                  <SkipForward className="w-4 h-4 mr-2" />
-                  Patient Not Available (Skip)
-                </Button>
-              </div>
-            ) : dialogTokenStatus === "unvisited" ? (
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600">
-                  Status:{" "}
-                  <span className="font-semibold text-purple-700">Skipped</span>
-                  . Patient was previously unavailable.
+                <p className="text-xs text-gray-400 text-center">
+                  This marks the consultation as finished. No refund will be issued.
                 </p>
+              </div>
+            )}
+
+            {/* ── PURPLE / UNVISITED: was skipped — patient returned ── */}
+            {dialogTokenStatus === "unvisited" && (
+              <div className="space-y-2">
+                <div className="bg-purple-50 border border-purple-200 rounded-xl p-3">
+                  <p className="text-sm text-purple-700 font-semibold">
+                    Previously marked unavailable
+                  </p>
+                  <p className="text-xs text-purple-500 mt-0.5">
+                    This patient was skipped earlier. If they have returned, mark them completed. Otherwise they remain eligible for a refund.
+                  </p>
+                </div>
                 <Button
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-11"
                   onClick={handleCompleteSkipped}
                   data-ocid="tokens.confirm_button"
                 >
                   <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Mark as Completed (Patient Arrived)
+                  Patient Returned — Mark Completed
                 </Button>
               </div>
-            ) : (
-              <Button
-                className="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold h-11"
-                onClick={handleMarkAsOngoing}
-                data-ocid="tokens.primary_button"
-              >
-                <Activity className="w-4 h-4 mr-2" />
-                Mark as Ongoing
-              </Button>
             )}
           </div>
 
