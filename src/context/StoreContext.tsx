@@ -93,7 +93,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // ── Subscribe to server status events from api.ts ─────────────────────────
   useEffect(() => {
     const unsub = api.onServerStatus(setServerStatus);
-    return unsub;
+    return () => { unsub(); };   // wrap so return type is void, not boolean
   }, []);
 
   // ── Core data loader ──────────────────────────────────────────────────────

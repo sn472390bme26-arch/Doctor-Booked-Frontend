@@ -171,14 +171,14 @@ export default function DoctorDashboard() {
     tokenNum: number | null;
   }>({ open: false, tokenNum: null });
 
-  const visibleSessions = useMemo(() => {
+  const visibleSessions = useMemo((): SessionType[] => {
     if (!doctor) return [];
-    return doctor.sessions.filter((s) => {
+    return (doctor.sessions as string[]).filter((s) => {
       if (isSessionCancelled(doctor.id, regDate, s)) return false;
       const sid = makeSessionId(doctor.id, regDate, s);
       if (tokenStates[sid]?.isClosed === true) return false;
       return true;
-    });
+    }) as SessionType[];
   }, [doctor, regDate, tokenStates, isSessionCancelled]);
 
   const availableDates = useMemo(() => getAvailableDates(), []);
@@ -371,7 +371,7 @@ export default function DoctorDashboard() {
     const skippedNum = tokenDialog.tokenNum;
     // Pass the explicit token number so backend marks THIS token as unvisited
     // even if it was never set to "ongoing" (currentToken would be null otherwise)
-    skipToken(sessionId, skippedNum ?? undefined);
+    skipToken(sessionId, skippedNum !== null ? skippedNum : undefined);
     // Find next red token to notify who is now "next up"
     const nextRed = Object.entries(statuses)
       .filter(([n, s]) => s === "red" && Number(n) !== skippedNum)
@@ -402,7 +402,7 @@ export default function DoctorDashboard() {
       "Session closed. Refunds will be processed for unvisited tokens.",
     );
     const next = visibleSessions.find((s) => s !== regSession);
-    if (next) setRegSession(next);
+    if (next) setRegSession(next as SessionType);
     setSessionActionResult({ type: "ended", session: sessionLabel });
   }
 
@@ -411,7 +411,7 @@ export default function DoctorDashboard() {
     cancelSession(doctor.id, regDate, regSession);
     toast.success("Session cancelled. Patients will be notified.");
     const next = visibleSessions.find((s) => s !== regSession);
-    if (next) setRegSession(next);
+    if (next) setRegSession(next as SessionType);
     setSessionActionResult({ type: "cancelled", session: sessionLabel });
   }
 

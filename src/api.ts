@@ -38,9 +38,9 @@ export function clearToken()              { localStorage.removeItem("db_jwt"); }
 // ── Server status events — UI subscribes to show/hide waking banner ───────────
 type StatusListener = (status: "ok" | "waking" | "offline") => void;
 const _statusListeners = new Set<StatusListener>();
-export function onServerStatus(fn: StatusListener) {
+export function onServerStatus(fn: StatusListener): () => void {
   _statusListeners.add(fn);
-  return () => _statusListeners.delete(fn);
+  return () => { _statusListeners.delete(fn); };
 }
 function emitStatus(s: "ok" | "waking" | "offline") {
   _statusListeners.forEach(fn => fn(s));
