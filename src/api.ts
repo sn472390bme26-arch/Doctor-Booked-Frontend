@@ -218,6 +218,9 @@ export const auth = {
     post<{ token: string; user: AppUser }>("/auth/doctor/login", { code, phone }),
   adminLogin: (code: string, password: string) =>
     post<{ token: string; user: AppUser }>("/auth/admin/login", { code, password }),
+  // Google One Tap — sends the credential JWT from Google to backend for verification
+  googleLogin: (credential: string) =>
+    post<{ token: string; user: AppUser }>("/auth/patient/google", { credential }),
   me: () => get<{ user: AppUser }>("/auth/me"),
 };
 
