@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Calendar, Clock, MapPin } from "lucide-react";
+import { Calendar, Clock, MapPin, WifiOff } from "lucide-react";
 import { motion } from "motion/react";
 import TopNav from "./components/layout/TopNav";
 import { StoreProvider, useStore } from "./context/StoreContext";
@@ -139,7 +139,7 @@ function LandingPage() {
 }
 
 function AppRoutes() {
-  const { user } = useStore();
+  const { user, serverStatus } = useStore();
   const { route } = useRouter();
 
   function renderPage() {
@@ -167,6 +167,22 @@ function AppRoutes() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {user && !isAdmin && <TopNav />}
+      {/* Server status banner — shown when Railway is waking up or unreachable */}
+      {serverStatus === "waking" && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white text-sm font-medium py-2 px-4 flex items-center justify-center gap-2 shadow-md">
+          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
+          Server is starting up — please wait a few seconds…
+        </div>
+      )}
+      {serverStatus === "offline" && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-red-500 text-white text-sm font-medium py-2 px-4 flex items-center justify-center gap-2 shadow-md">
+          <WifiOff className="w-4 h-4" />
+          Cannot reach the server. Check your internet or wait — retrying automatically…
+        </div>
+      )}
       <main className="flex-1">{renderPage()}</main>
       <Toaster richColors position="top-right" />
     </div>

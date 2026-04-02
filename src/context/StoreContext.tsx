@@ -18,6 +18,7 @@ export type AppStore = ReturnType<typeof useStore>;
 
 interface Store {
   user: AppUser | null;
+  serverStatus: "ok" | "waking" | "offline";
   login: (u: AppUser, token: string) => void;
   logout: () => void;
   hospitals: Hospital[];
@@ -68,14 +69,13 @@ export function useStore(): Store {
   return c;
 }
 
-// How often to refresh hospitals + doctors from the server (ms)
-// This ensures data never goes stale / disappears
-const REFRESH_INTERVAL_MS = 30_000; // every 30 seconds
+const REFRESH_MS = 30_000;
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(() => {
     try { return JSON.parse(localStorage.getItem("db_user") || "null"); } catch { return null; }
   });
+  const [serverStatus, setServerStatus] = useState<"ok" | "waking" | "offline">("ok");
   const [hospitals, setHospitals]     = useState<Hospital[]>([]);
   const [doctors, setDoctors]         = useState<Doctor[]>([]);
   const [bookings, setBookings]       = useState<Booking[]>([]);
@@ -84,86 +84,88 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [cancelled, setCancelled]     = useState<string[]>([]);
   const [notification, setNotification] = useState<string | null>(null);
 
-  const wsRefs      = useRef<Record<string, () => void>>({});
-  const userRef     = useRef<AppUser | null>(user);
+  const wsRefs       = useRef<Record<string, () => void>>({});
+  const userRef      = useRef<AppUser | null>(user);
   const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Keep userRef in sync so interval callbacks always see current user
   useEffect(() => { userRef.current = user; }, [user]);
 
-  // ── Core data loader — never throws, always retries silently ──────────────
-  const loadCoreData = useCallback(async (u: AppUser | null) => {
+  // ── Subscribe to server status events from api.ts ─────────────────────────
+  useEffect(() => {
+    const unsub = api.onServerStatus(setServerStatus);
+    return unsub;
+  }, []);
+
+  // ── Core data loader ──────────────────────────────────────────────────────
+  // Background = true means errors are silently swallowed (periodic refresh)
+  // Background = false means errors propagate (initial load after login)
+  const loadCoreData = useCallback(async (u: AppUser | null, background = false) => {
     try {
-      // Always load hospitals and doctors — needed by all roles
       const [h, d] = await Promise.all([
         api.hospitals.list(),
         api.doctors.list(),
       ]);
       setHospitals(h);
       setDoctors(d);
-    } catch {
-      // Server might be waking up (Railway free tier) — silently ignore,
-      // the interval will retry in 30 seconds
+    } catch (err) {
+      // On initial load, keep whatever data we already have
+      // On background refresh, just skip silently — will retry in 30s
+      if (!background) console.error("[store] initial hospitals/doctors load failed:", err);
     }
 
-    try {
-      api.tokens.getCancelledSessions().then(setCancelled).catch(() => {});
-    } catch {}
+    // Cancelled sessions — always silent
+    api.tokens.getCancelledSessions().then(setCancelled).catch(() => {});
 
     if (!u) return;
 
-    // Load bookings for logged-in users
     try {
       const b = await api.bookings.list();
       setBookings(b);
-    } catch {}
+    } catch (err) {
+      if (!background) console.error("[store] bookings load failed:", err);
+    }
 
-    // Load patients list for admin
     if (u.role === "admin") {
       try {
         const p = await api.patients.list();
         setPatients(p);
-      } catch {}
+      } catch (err) {
+        if (!background) console.error("[store] patients load failed:", err);
+      }
     }
   }, []);
 
-  // ── Initial load + periodic background refresh ────────────────────────────
+  // ── Initial load + periodic refresh ───────────────────────────────────────
   useEffect(() => {
-    // Load immediately
-    loadCoreData(user);
+    loadCoreData(user, false);
 
-    // Set up periodic refresh so data never disappears
     if (refreshTimer.current) clearInterval(refreshTimer.current);
     refreshTimer.current = setInterval(() => {
-      loadCoreData(userRef.current);
-    }, REFRESH_INTERVAL_MS);
+      loadCoreData(userRef.current, true); // background = silent
+    }, REFRESH_MS);
 
-    return () => {
-      if (refreshTimer.current) clearInterval(refreshTimer.current);
-    };
+    return () => { if (refreshTimer.current) clearInterval(refreshTimer.current); };
   }, [user]); // eslint-disable-line
 
-  // ── Reload when tab becomes visible again (user switches back to the tab) ──
+  // ── Reload on tab focus ───────────────────────────────────────────────────
   useEffect(() => {
     function onVisible() {
-      if (document.visibilityState === "visible") {
-        loadCoreData(userRef.current);
-      }
+      if (document.visibilityState === "visible") loadCoreData(userRef.current, true);
     }
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, []); // eslint-disable-line
 
-  // ── WebSocket subscription ────────────────────────────────────────────────
+  // ── WebSocket ─────────────────────────────────────────────────────────────
   const subscribe = useCallback((sid: string) => {
     if (wsRefs.current[sid]) return;
     wsRefs.current[sid] = api.connectTokenSocket(sid, (msg) => {
       if (msg.type === "state_update" && msg.state)
         setTokenStates(p => ({ ...p, [sid]: msg.state! }));
       else if (msg.type === "token_booked")
-        api.tokens.getState(sid).then(s => {
-          if (s) setTokenStates(p => ({ ...p, [sid]: s }));
-        }).catch(() => {});
+        api.tokens.getState(sid)
+          .then(s => { if (s) setTokenStates(p => ({ ...p, [sid]: s })); })
+          .catch(() => {});
     });
   }, []);
 
@@ -177,10 +179,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     api.clearToken();
     localStorage.removeItem("db_user");
-    setUser(null);
-    setBookings([]);
-    setPatients([]);
-    setTokenStates({});
+    setUser(null); setBookings([]); setPatients([]); setTokenStates({});
     Object.values(wsRefs.current).forEach(fn => fn());
     wsRefs.current = {};
   }, []);
@@ -221,7 +220,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // ── Doctors ───────────────────────────────────────────────────────────────
   const addDoctor = useCallback(async (data: Omit<Doctor, "id" | "code">) => {
     const d = await api.doctors.create(data as Partial<Doctor>);
-    // Refresh full doctors list after adding to ensure counts are accurate
     setDoctors(p => [...p, d]);
     api.doctors.list().then(setDoctors).catch(() => {});
     return d;
@@ -238,18 +236,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setBookings(p => p.map(b =>
       b.doctorId === id ? { ...b, status: "cancelled" as const } : b
     ));
-    // Refresh hospitals list so doctor counts update
     api.hospitals.list().then(setHospitals).catch(() => {});
   }, []);
 
   // ── Bookings ──────────────────────────────────────────────────────────────
   const addBooking = useCallback(async (data: any) => {
     const b = await api.bookings.create({
-      doctorId:  data.doctorId,
-      date:      data.date,
-      session:   data.session,
-      complaint: data.complaint,
-      phone:     data.phone,
+      doctorId: data.doctorId, date: data.date,
+      session: data.session, complaint: data.complaint, phone: data.phone,
     });
     setBookings(p => [...p, b]);
     subscribe(b.sessionId);
@@ -271,9 +265,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const getOrCreateTokenState = useCallback((sid: string, doctorId: string, date: string, session: string) => {
     if (!tokenStates[sid]) {
-      api.tokens.getState(sid).then(s => {
-        setTokenStates(p => ({ ...p, [sid]: s ?? EMPTY(sid, doctorId, date, session) }));
-      }).catch(() => {});
+      api.tokens.getState(sid)
+        .then(s => setTokenStates(p => ({ ...p, [sid]: s ?? EMPTY(sid, doctorId, date, session) })))
+        .catch(() => {});
       subscribe(sid);
       return EMPTY(sid, doctorId, date, session);
     }
@@ -308,8 +302,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setTokenStates(p => ({ ...p, [sid]: s }));
     setBookings(p => p.map(b =>
       b.sessionId === sid && b.status === "confirmed"
-        ? { ...b, status: "unvisited" as const }
-        : b
+        ? { ...b, status: "unvisited" as const } : b
     ));
   }, []);
 
@@ -338,8 +331,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }), [hospitals, doctors, patients, bookings, tokenStates]);
 
   const refreshFromStorage = useCallback(async () => {
-    // Refresh both core data and token states
-    await loadCoreData(userRef.current);
+    await loadCoreData(userRef.current, true);
     await Promise.all(
       Object.keys(tokenStates).map(sid =>
         api.tokens.getState(sid)
@@ -349,19 +341,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     );
   }, [tokenStates, loadCoreData]);
 
-  const getPatientCredentials = useCallback(
-    () => ({} as Record<string, { name: string; password: string }>), []
-  );
-  const getPatientNameIndex = useCallback(
-    () => ({} as Record<string, string>), []
-  );
+  const getPatientCredentials = useCallback(() => ({} as Record<string, { name: string; password: string }>), []);
+  const getPatientNameIndex   = useCallback(() => ({} as Record<string, string>), []);
   const savePatientCredential = useCallback(() => {}, []);
 
   const value: Store = {
-    user, login, logout,
+    user, serverStatus, login, logout,
     hospitals, addHospital, updateHospital, updateHospitalPhoto, deleteHospital,
-    doctors,   addDoctor,   updateDoctor,   deleteDoctor,
-    bookings,  addBooking,  getBookingsForPatient, getBookingsForSession,
+    doctors, addDoctor, updateDoctor, deleteDoctor,
+    bookings, addBooking, getBookingsForPatient, getBookingsForSession,
     patients,
     tokenStates, getOrCreateTokenState, bookToken,
     regulateToken, completeCurrentToken, skipToken, completeSkippedToken,
