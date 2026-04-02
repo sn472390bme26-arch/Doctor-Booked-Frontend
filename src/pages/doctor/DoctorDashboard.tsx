@@ -146,7 +146,7 @@ export default function DoctorDashboard() {
       yearsOfExperience: doctor.yearsOfExperience ?? "",
       education: doctor.education ?? "",
       languages: doctor.languages ?? [],
-      sessionTimings: (doctor.sessionTimings ?? {}) as Partial<Record<SessionType, SessionTiming>> ?? {},
+      sessionTimings: (doctor.sessionTimings ?? {}) as Partial<Record<SessionType, SessionTiming>>,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doctor?.id, doctor?.phone]); // eslint-disable-line
