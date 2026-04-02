@@ -46,7 +46,7 @@ interface Store {
   bookToken: (sid: string, doctorId: string, date: string, session: string, tokenNumber: number) => void;
   regulateToken: (sid: string, clickedToken: number) => Promise<void>;
   completeCurrentToken: (sid: string) => Promise<void>;
-  skipToken: (sid: string) => Promise<void>;
+  skipToken: (sid: string, tokenNum?: number) => Promise<void>;
   completeSkippedToken: (sid: string, tokenNum: number) => Promise<void>;
   closeSession: (sid: string) => Promise<void>;
   setPrioritySlot: (sid: string, slotIndex: number, slot: PrioritySlotState) => Promise<void>;
@@ -287,8 +287,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setTokenStates(p => ({ ...p, [sid]: s }));
   }, []);
 
-  const skipToken = useCallback(async (sid: string) => {
-    const s = await api.tokens.skip(sid);
+  const skipToken = useCallback(async (sid: string, tokenNum?: number) => {
+    const s = await api.tokens.skip(sid, tokenNum);
     setTokenStates(p => ({ ...p, [sid]: s }));
   }, []);
 

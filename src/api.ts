@@ -261,7 +261,7 @@ export const tokens = {
   getState:        (sid: string)                                  => get<SessionTokenState | null>(`/tokens/${sid}`),
   regulate:        (sid: string, clickedToken: number)            => post<SessionTokenState>(`/tokens/${sid}/regulate`, { clickedToken }),
   complete:        (sid: string)                                  => post<SessionTokenState>(`/tokens/${sid}/complete`),
-  skip:            (sid: string)                                  => post<SessionTokenState>(`/tokens/${sid}/skip`),
+  skip:            (sid: string, tokenNum?: number)               => post<SessionTokenState>(`/tokens/${sid}/skip`, tokenNum != null ? { tokenNum } : undefined),
   completeSkipped: (sid: string, tokenNum: number)                => post<SessionTokenState>(`/tokens/${sid}/complete-skipped`, { tokenNum }),
   closeSession:    (sid: string)                                  => post<SessionTokenState>(`/tokens/${sid}/close`),
   setPrioritySlot: (sid: string, slotIndex: number, slot: PrioritySlotState) =>

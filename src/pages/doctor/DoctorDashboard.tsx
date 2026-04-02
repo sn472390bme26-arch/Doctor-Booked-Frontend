@@ -369,7 +369,9 @@ export default function DoctorDashboard() {
 
   function handleSkipToken() {
     const skippedNum = tokenDialog.tokenNum;
-    skipToken(sessionId);
+    // Pass the explicit token number so backend marks THIS token as unvisited
+    // even if it was never set to "ongoing" (currentToken would be null otherwise)
+    skipToken(sessionId, skippedNum ?? undefined);
     // Find next red token to notify who is now "next up"
     const nextRed = Object.entries(statuses)
       .filter(([n, s]) => s === "red" && Number(n) !== skippedNum)
