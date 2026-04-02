@@ -733,62 +733,91 @@ export default function DoctorDashboard() {
                     </p>
                   </div>
                 ) : regDate > today ? (
-                  /* Future date — show locked state, only cancel available above */
-                  <div className="py-12 text-center">
-                    <Lock className="w-10 h-10 text-blue-300 mx-auto mb-3" />
-                    <p className="text-gray-700 font-semibold text-base">
-                      Session Not Yet Started
-                    </p>
-                    <p className="text-gray-400 text-sm mt-1">
-                      This session is scheduled for{" "}
-                      {new Date(`${regDate}T00:00:00`).toLocaleDateString(
-                        "en-IN",
-                        { weekday: "long", day: "numeric", month: "long" },
-                      )}
-                      .
-                    </p>
-                    <p className="text-gray-400 text-sm mt-0.5">
-                      Token regulation will be available on that date at{" "}
-                      {getSessionStartTime(regSession)}.
-                    </p>
+                  /* Future date — show token grid behind transparent lock overlay */
+                  <div className="relative">
+                    {/* Token grid — visible but non-interactive */}
+                    <div className="pointer-events-none select-none opacity-40">
+                      <div className="flex flex-wrap gap-3 mb-4">
+                        {([["#fff","Available"],["#ef4444","Booked"]] as [string,string][]).map(([color,label]) => (
+                          <div key={label} className="flex items-center gap-1.5">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                            <span className="text-xs text-gray-500">{label}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                        {renderTokenGrid()}
+                      </div>
+                    </div>
+                    {/* Transparent lock overlay */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl bg-white/70 backdrop-blur-[2px]">
+                      <div className="bg-white/90 border border-blue-100 rounded-2xl px-6 py-5 text-center shadow-sm max-w-xs">
+                        <Lock className="w-8 h-8 text-blue-300 mx-auto mb-2" />
+                        <p className="text-gray-700 font-semibold text-sm">
+                          Session Not Yet Started
+                        </p>
+                        <p className="text-gray-400 text-xs mt-1">
+                          Scheduled for{" "}
+                          {new Date(`${regDate}T00:00:00`).toLocaleDateString("en-IN",
+                            { weekday: "long", day: "numeric", month: "long" }
+                          )}
+                          {" "}at {getSessionStartTime(regSession)}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 ) : !isSessionAccessibleNow && !isClosed ? (
-                  /* Today but session hasn't started yet */
-                  <div className="py-12 text-center">
-                    <Lock className="w-10 h-10 text-yellow-400 mx-auto mb-3" />
-                    <p className="text-gray-700 font-semibold text-base">
-                      Session Starts at {getSessionStartTime(regSession)}
-                    </p>
-                    <p className="text-gray-400 text-sm mt-1">
-                      The token regulator unlocks 30 minutes before the session start time.
-                    </p>
-                    <p className="text-gray-400 text-sm mt-0.5">
-                      You can cancel this session using the button above if needed.
-                    </p>
-                    <Button
-                      className="mt-5 bg-teal-500 hover:bg-teal-600 text-white px-6"
-                      onClick={() => {
-                        // Force-unlock by setting a temporary override in sessionTimings
-                        // so the session is accessible right now
-                        const now = new Date();
-                        const hh = String(now.getHours()).padStart(2, "0");
-                        const mm = String(now.getMinutes()).padStart(2, "0");
-                        updateDoctor(doctor.id, {
-                          sessionTimings: {
-                            ...(doctor.sessionTimings ?? {}),
-                            [regSession]: {
-                              start: `${hh}:${mm}`,
-                              end: (doctor.sessionTimings?.[regSession] ??
-                                DEFAULT_TIMINGS[regSession]).end,
-                            },
-                          },
-                        });
-                        toast.success("Session unlocked — you can now regulate tokens.");
-                      }}
-                    >
-                      <Activity className="w-4 h-4 mr-2" />
-                      Start Session Now
-                    </Button>
+                  /* Today but session hasn't started — show grid behind transparent lock */
+                  <div className="relative">
+                    {/* Token grid — visible but non-interactive */}
+                    <div className="pointer-events-none select-none opacity-40">
+                      <div className="flex flex-wrap gap-3 mb-4">
+                        {([["#fff","Available"],["#ef4444","Booked"]] as [string,string][]).map(([color,label]) => (
+                          <div key={label} className="flex items-center gap-1.5">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                            <span className="text-xs text-gray-500">{label}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                        {renderTokenGrid()}
+                      </div>
+                    </div>
+                    {/* Transparent lock overlay with Start Session Now button */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl bg-white/70 backdrop-blur-[2px]">
+                      <div className="bg-white/90 border border-yellow-100 rounded-2xl px-6 py-5 text-center shadow-sm max-w-xs">
+                        <Lock className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+                        <p className="text-gray-700 font-semibold text-sm">
+                          Session Starts at {getSessionStartTime(regSession)}
+                        </p>
+                        <p className="text-gray-400 text-xs mt-1">
+                          Unlocks 30 min before start. You can see booked tokens above.
+                        </p>
+                        <Button
+                          size="sm"
+                          className="mt-3 bg-teal-500 hover:bg-teal-600 text-white px-4 text-xs"
+                          onClick={() => {
+                            const now = new Date();
+                            const hh = String(now.getHours()).padStart(2, "0");
+                            const mm = String(now.getMinutes()).padStart(2, "0");
+                            updateDoctor(doctor.id, {
+                              sessionTimings: {
+                                ...(doctor.sessionTimings ?? {}),
+                                [regSession]: {
+                                  start: `${hh}:${mm}`,
+                                  end: (doctor.sessionTimings?.[regSession] ??
+                                    DEFAULT_TIMINGS[regSession]).end,
+                                },
+                              },
+                            });
+                            toast.success("Session unlocked — you can now regulate tokens.");
+                          }}
+                        >
+                          <Activity className="w-3.5 h-3.5 mr-1.5" />
+                          Start Session Now
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <>
