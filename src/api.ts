@@ -92,12 +92,12 @@ function fetchWithTimeout(url: string, opts: RequestInit, ms: number): Promise<R
   return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(id));
 }
 
-// ── Retry schedule — outlasts Railway 30s cold start ─────────────────────────
-//  Attempt : 1    2     3     4      5      6
-//  Pre-wait: 0   1000  3000  6000  10000  15000  ms
-//  Cumulative patience: 35 seconds of waiting between attempts
-//  Each attempt itself has a 20s timeout → total patience ~55 seconds
-const DELAYS     = [0, 1000, 3000, 6000, 10000, 15000];
+// ── Retry schedule — outlasts Railway 45s worst-case cold start ──────────────
+//  Attempt : 1    2     3     4      5      6      7
+//  Pre-wait: 0   1000  3000  6000  10000  15000  20000  ms
+//  Cumulative patience: 55 seconds of waiting between attempts
+//  Each attempt itself has a 20s timeout → total patience ~75 seconds
+const DELAYS     = [0, 1000, 3000, 6000, 10000, 15000, 20000];
 const MAX_RETRY  = DELAYS.length;
 const REQ_TIMEOUT = 20_000; // ms per attempt
 
@@ -204,8 +204,9 @@ const del   = <T>(path: string)              => req<T>("DELETE", path);
   // Ping immediately on page load (wakes server before user tries to log in)
   ping();
 
-  // Then ping every 4 minutes to prevent sleep
-  setInterval(ping, 4 * 60 * 1000);
+  // Then ping every 3 minutes to prevent Railway from sleeping
+  // Railway free tier sleeps after 5 min idle — 3 min gives a safe margin
+  setInterval(ping, 3 * 60 * 1000);
 })();
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
