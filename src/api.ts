@@ -211,45 +211,36 @@ const del   = <T>(path: string)              => req<T>("DELETE", path);
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const auth = {
-  patientSignup: (name: string, email: string, password: string) =>
-    post<{ token: string; user: AppUser }>("/auth/patient/signup", { name, email, password }),
+  // Signup — called AFTER Firebase phone OTP is verified
+  // firebaseIdToken comes from confirmationResult.confirm(otp) → user.getIdToken()
+  patientSignup: (name: string, email: string, password: string, firebaseIdToken: string) =>
+    post<{ token: string; user: AppUser }>("/auth/patient/signup", { name, email, password, firebaseIdToken }),
+
+  // Login step 1 — verify credentials, get back which phone to OTP
   patientLogin: (email: string, password: string) =>
-    post<{ token: string; user: AppUser }>("/auth/patient/login", { email, password }),
+    post<{
+      // success path — phone exists, needs OTP
+      success?: boolean; userId?: string; phone?: string; maskedPhone?: string;
+      // old account path — no phone yet
+      token?: string; user?: AppUser; needsPhone?: boolean;
+    }>("/auth/patient/login", { email, password }),
+
+  // Login step 2 — after Firebase OTP verified, send token to backend
+  patientLoginVerify: (userId: string, firebaseIdToken: string) =>
+    post<{ token: string; user: AppUser }>("/auth/patient/login-verify", { userId, firebaseIdToken }),
   doctorLogin: (code: string, phone: string) =>
     post<{ token: string; user: AppUser }>("/auth/doctor/login", { code, phone }),
   adminLogin: (code: string, password: string) =>
     post<{ token: string; user: AppUser }>("/auth/admin/login", { code, password }),
-  // Step 1: submit email+password+phone → backend sends OTP → returns otpId
-  patientSignupRequestOTP: (name: string, email: string, password: string, phone: string) =>
-    post<{ success: boolean; otpId: string; phone: string; message: string; devOtp?: string }>(
-      "/auth/patient/signup", { name, email, password, phone }
-    ),
-  // Step 1 login: submit email+password → backend sends OTP to saved phone → returns otpId
-  patientLoginRequestOTP: (email: string, password: string) =>
-    post<{ success?: boolean; otpId?: string; phone?: string; message?: string; devOtp?: string; token?: string; user?: AppUser; needsPhone?: boolean }>(
-      "/auth/patient/login", { email, password }
-    ),
-  // Step 2: submit otpId + 6-digit OTP → backend creates account & returns JWT
-  verifyOTP: (otpId: string, otp: string) =>
-    post<{ token: string; user: AppUser }>("/auth/patient/verify-otp", { otpId, otp }),
-  // Resend OTP
-  resendOTP: (otpId: string) =>
-    post<{ success: boolean; message: string; devOtp?: string }>("/auth/patient/resend-otp", { otpId }),
+
   // Google One Tap — returns needsPhone:true if phone not yet verified
   googleLogin: (credential: string) =>
-    post<{ token?: string; user?: AppUser; needsPhone?: boolean; userId?: string; name?: string; email?: string; message?: string }>(
+    post<{ token?: string; user?: AppUser; needsPhone?: boolean; userId?: string; name?: string; email?: string }>(
       "/auth/patient/google", { credential }
     ),
-  // Google: send OTP to phone to complete verification
-  googlePhoneOTP: (userId: string, phone: string) =>
-    post<{ success: boolean; otpId: string; phone: string; message: string; devOtp?: string }>(
-      "/auth/patient/google-phone-otp", { userId, phone }
-    ),
-  // Add phone to existing account (old users)
-  sendPhoneOTP: (userId: string, phone: string) =>
-    post<{ success: boolean; otpId: string; phone: string; message: string; devOtp?: string }>(
-      "/auth/patient/send-phone-otp", { userId, phone }
-    ),
+  // After Google login, save verified phone (firebaseIdToken from Firebase phone auth)
+  googleVerifyPhone: (userId: string, firebaseIdToken: string) =>
+    post<{ token: string; user: AppUser }>("/auth/patient/google-verify-phone", { userId, firebaseIdToken }),
   me: () => get<{ user: AppUser }>("/auth/me"),
 };
 
