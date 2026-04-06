@@ -211,38 +211,41 @@ const del   = <T>(path: string)              => req<T>("DELETE", path);
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const auth = {
-  // Signup — called AFTER Firebase phone OTP is verified
-  // firebaseIdToken comes from confirmationResult.confirm(otp) → user.getIdToken()
-  patientSignup: (name: string, email: string, password: string, firebaseIdToken: string) =>
-    post<{ token: string; user: AppUser }>("/auth/patient/signup", { name, email, password, firebaseIdToken }),
-
-  // Login step 1 — verify credentials, get back which phone to OTP
+  // Step 1 signup: send form data → backend sends MSG91 OTP → returns otpId
+  patientSignup: (name: string, email: string, password: string, phone: string) =>
+    post<{ success: boolean; otpId: string; maskedPhone: string; message: string; devOtp?: string }>(
+      "/auth/patient/signup", { name, email, password, phone }
+    ),
+  // Step 1 login: verify credentials → backend sends OTP to saved phone → returns otpId
   patientLogin: (email: string, password: string) =>
     post<{
-      // success path — phone exists, needs OTP
-      success?: boolean; userId?: string; phone?: string; maskedPhone?: string;
-      // old account path — no phone yet
+      success?: boolean; otpId?: string; maskedPhone?: string; message?: string; devOtp?: string;
       token?: string; user?: AppUser; needsPhone?: boolean;
     }>("/auth/patient/login", { email, password }),
-
-  // Login step 2 — after Firebase OTP verified, send token to backend
-  patientLoginVerify: (userId: string, firebaseIdToken: string) =>
-    post<{ token: string; user: AppUser }>("/auth/patient/login-verify", { userId, firebaseIdToken }),
-  doctorLogin: (code: string, phone: string) =>
-    post<{ token: string; user: AppUser }>("/auth/doctor/login", { code, phone }),
-  adminLogin: (code: string, password: string) =>
-    post<{ token: string; user: AppUser }>("/auth/admin/login", { code, password }),
-
-  // Google One Tap — returns needsPhone:true if phone not yet verified
+  // Step 2: submit otpId + 6-digit code → backend verifies → returns JWT
+  verifyOTP: (otpId: string, otp: string) =>
+    post<{ token: string; user: AppUser }>("/auth/patient/verify-otp", { otpId, otp }),
+  // Resend OTP
+  resendOTP: (otpId: string) =>
+    post<{ success: boolean; message: string; devOtp?: string }>("/auth/patient/resend-otp", { otpId }),
+  // Google One Tap — returns needsPhone:true for new users
   googleLogin: (credential: string) =>
     post<{ token?: string; user?: AppUser; needsPhone?: boolean; userId?: string; name?: string; email?: string }>(
       "/auth/patient/google", { credential }
     ),
-  // After Google login, save verified phone (firebaseIdToken from Firebase phone auth)
-  googleVerifyPhone: (userId: string, firebaseIdToken: string) =>
-    post<{ token: string; user: AppUser }>("/auth/patient/google-verify-phone", { userId, firebaseIdToken }),
+  // Google: send OTP to phone collected after Google login
+  googlePhoneOTP: (userId: string, phone: string) =>
+    post<{ success: boolean; otpId: string; maskedPhone: string; message: string; devOtp?: string }>(
+      "/auth/patient/google-phone-otp", { userId, phone }
+    ),
+  adminLogin: (code: string, password: string) =>
+    post<{ token: string; user: AppUser }>("/auth/admin/login", { code, password }),
+  doctorLogin: (code: string, phone: string) =>
+    post<{ token: string; user: AppUser }>("/auth/doctor/login", { code, phone }),
   me: () => get<{ user: AppUser }>("/auth/me"),
 };
+
+
 
 // ── Hospitals ─────────────────────────────────────────────────────────────────
 export const hospitals = {
