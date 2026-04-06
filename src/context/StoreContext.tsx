@@ -38,6 +38,7 @@ interface Store {
     paymentDone?: boolean; status?: string;
     complaint?: string; phone?: string;
   }) => Promise<void>;
+  addBookingToStore: (booking: Booking) => void;
   getBookingsForPatient: (patientId: string) => Booking[];
   getBookingsForSession: (sessionId: string) => Booking[];
   patients: PatientRecord[];
@@ -247,6 +248,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
     setBookings(p => [...p, b]);
     subscribe(b.sessionId);
+  }, [subscribe]);
+
+  // Called by BookingDialog after Razorpay payment succeeds — adds booking to local state
+  const addBookingToStore = useCallback((booking: Booking) => {
+    setBookings(p => [...p.filter(b => b.id !== booking.id), booking]);
+    subscribe(booking.sessionId);
   }, [subscribe]);
 
   const getBookingsForPatient = useCallback((pid: string) =>

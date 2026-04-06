@@ -297,6 +297,24 @@ export const tokens = {
   getCancelledSessions: () => get<string[]>("/tokens/cancelled/list"),
 };
 
+// ── Payments ─────────────────────────────────────────────────────────────────
+export const payments = {
+  // Step 1: create Razorpay order → returns orderId, amount, keyId
+  createOrder: (data: {
+    doctorId: string; date: string; session: string; complaint?: string; phone?: string;
+  }) => post<{
+    orderId: string; amount: number; amountRupees: number;
+    currency: string; keyId: string; doctorName: string; hospitalName: string;
+  }>("/payments/create-order", data),
+
+  // Step 2: verify payment after Razorpay checkout completes
+  verifyPayment: (data: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }) => post<{ success: boolean; booking: Booking }>("/payments/verify", data),
+};
+
 // ── Patients ──────────────────────────────────────────────────────────────────
 export const patients = {
   list: () => get<PatientRecord[]>("/patients"),
